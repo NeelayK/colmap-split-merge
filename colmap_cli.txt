@@ -1,0 +1,38 @@
+$WORKSPACE = C:\Users\chand\OneDrive\Documents\Neelay\colmap\colmap_workspace\overlap_x"
+
+colmap feature_extractor `
+    --database_path "$WORKSPACE\database.db" `
+    --image_path "$WORKSPACE\images" `
+    --FeatureExtraction.type ALIKED_N16ROT `
+    --AlikedExtraction.max_num_features 2048 `
+    --FeatureExtraction.use_gpu 0
+
+colmap exhaustive_matcher `
+    --database_path "$WORKSPACE\database.db" `
+    --FeatureMatching.type ALIKED_LIGHTGLUE `
+    --FeatureMatching.use_gpu 0
+
+colmap mapper `
+    --database_path "$WORKSPACE\database.db" `
+    --image_path "$WORKSPACE\images" `
+    --Mapper.image_list_path "$WORKSPACE\dataset1_list.txt" `
+    --output_path "$WORKSPACE\sparse1"
+
+colmap mapper `
+    --database_path "$WORKSPACE\database.db" `
+    --image_path "$WORKSPACE\images" `
+    --Mapper.image_list_path "$WORKSPACE\dataset2_list.txt" `
+    --output_path "$WORKSPACE\sparse2"
+
+
+colmap model_merger `
+    --input_path1 "$WORKSPACE\sparse1\0" `
+    --input_path2 "$WORKSPACE\sparse2\0" `
+    --output_path "$WORKSPACE\merged"
+
+colmap bundle_adjuster `
+    --input_path "$WORKSPACE\merged" `
+    --output_path "$WORKSPACE\merged"
+
+    -------
+
