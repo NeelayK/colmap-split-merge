@@ -1,3 +1,11 @@
+
+#-----------------------------------------------
+# Use this for merging sparse reconstruction
+# with GT poses 
+#-----------------------------------------------
+
+
+
 import time
 import json
 import subprocess
@@ -5,16 +13,12 @@ from pathlib import Path
 import numpy as np
 import pycolmap
 
-# ------------------------------------------------------
-# 1. Configuration
-# ------------------------------------------------------
-BASE_WORKSPACE = Path(r"C:\Users\chand\OneDrive\Documents\Neelay\colmap\colmap_workspace")
+WORKSPACE_DIR="./colmap_workspace"
+DATASET_DIR="./dataset"
+BASE_WORKSPACE = Path(WORKSPACE_DIR).resolve()
 DIR_GT = Path(r"C:\Users\chand\OneDrive\Documents\Neelay\colmap\dataset")
 LOG_OUTPUT_FILE = BASE_WORKSPACE / "batch_evaluation_summary.json"
 
-# ------------------------------------------------------
-# 2. Evaluation Helpers (Integrated from your visualization script)
-# ------------------------------------------------------
 def umeyama_alignment(src, dst):
     num_pts, dim = src.shape
     src_mean, dst_mean = src.mean(axis=0), dst.mean(axis=0)
@@ -31,7 +35,6 @@ def umeyama_alignment(src, dst):
     return T, Scale, Rotation, Translation
 
 def evaluate_reconstruction(merged_sparse_dir, dir_gt):
-    """Loads the final merged model and returns calculated errors against ground truth."""
     recon = pycolmap.Reconstruction(merged_sparse_dir)
     reg_images = {im.name: im for im_id, im in recon.images.items() if recon.exists_image(im_id)}
     
@@ -49,11 +52,9 @@ def evaluate_reconstruction(merged_sparse_dir, dir_gt):
     X_recon = np.array(recon_points)
     Y_gt = np.array(gt_points)
     
-    # Compute registration alignment metrics
     T, scale, R, t = umeyama_alignment(X_recon, Y_gt)
     aligned_to_gt = (scale * (X_recon @ T[:3, :3].T / scale)) + T[:3, 3]
     
-    # Absolute Trajectory Error calculations
     ate_errors = np.linalg.norm(Y_gt - aligned_to_gt, axis=1)
     ate_rmse = float(np.sqrt(np.mean(ate_errors**2)))
     mean_ate = float(np.mean(ate_errors))
@@ -72,9 +73,6 @@ def evaluate_reconstruction(merged_sparse_dir, dir_gt):
         "translation_vector": t.tolist()
     }
 
-# ------------------------------------------------------
-# 3. Execution Engine
-# ------------------------------------------------------
 def run_command(command_list, step_name):
     print(f"Executing: {step_name}...")
     start_time = time.time()
@@ -83,7 +81,6 @@ def run_command(command_list, step_name):
         return time.time() - start_time
     except subprocess.CalledProcessError as e:
         print(f"--> [ERROR] {step_name} failed. Return code: {e.returncode}")
-        # Print internal colmap logs for visibility on errors
         if e.stderr:
             print(f"Details:\n{e.stderr[-500:]}") 
         raise e
@@ -96,7 +93,6 @@ def batch_process_and_log():
         print(f"No target folders located inside {base_path}.")
         return
 
-    # Dictionary where all performance benchmarks will be recorded
     master_log = {}
 
     for overlap_dir in sorted(overlap_dirs):
@@ -104,7 +100,6 @@ def batch_process_and_log():
         print(f" RUNNING BENCHMARK SEQUENCE FOR: {overlap_dir.name} ")
         print("="*80)
 
-        # Setup standard folder routing paths
         db_path = overlap_dir / "database.db"
         img_path = overlap_dir / "images"
         list1_path = overlap_dir / "dataset1_list.txt"
@@ -115,7 +110,6 @@ def batch_process_and_log():
 
         for p in [sparse1_path, sparse2_path, merged_path]: p.mkdir(parents=True, exist_ok=True)
 
-        # Pre-populate metric templates
         master_log[overlap_dir.name] = {
             "timings_seconds": {},
             "total_pipeline_time_seconds": 0,
@@ -123,7 +117,6 @@ def batch_process_and_log():
             "metrics": {}
         }
 
-        # Configuration Command Structuring
         cmd_extract = ["colmap", "feature_extractor", "--database_path", str(db_path), "--image_path", str(img_path), "--FeatureExtraction.type", "ALIKED_N16ROT", "--AlikedExtraction.max_num_features", "2048", "--FeatureExtraction.use_gpu", "0"]
         cmd_match = ["colmap", "exhaustive_matcher", "--database_path", str(db_path), "--FeatureMatching.type", "ALIKED_LIGHTGLUE", "--FeatureMatching.use_gpu", "0"]
         cmd_map1 = ["colmap", "mapper", "--database_path", str(db_path), "--image_path", str(img_path), "--Mapper.image_list_path", str(list1_path), "--output_path", str(sparse1_path)]
@@ -134,7 +127,6 @@ def batch_process_and_log():
         start_total_time = time.time()
         
         try:
-            # Execute tasks and log individual component times
             master_log[overlap_dir.name]["timings_seconds"]["feature_extraction"] = run_command(cmd_extract, "Step 1/6: Feature Extraction")
             master_log[overlap_dir.name]["timings_seconds"]["exhaustive_matching"] = run_command(cmd_match, "Step 2/6: Feature Matching")
             master_log[overlap_dir.name]["timings_seconds"]["mapping_dataset1"] = run_command(cmd_map1, "Step 3/6: Mapping Sub-Model 1")
@@ -145,7 +137,6 @@ def batch_process_and_log():
             master_log[overlap_dir.name]["total_pipeline_time_seconds"] = time.time() - start_total_time
             master_log[overlap_dir.name]["pipeline_status"] = "Completed Successfully"
             
-            # --- Post-Pipeline Evaluation Parsing ---
             print("Calculating alignment accuracy configurations against Ground Truth...")
             eval_metrics = evaluate_reconstruction(merged_path, DIR_GT)
             master_log[overlap_dir.name]["metrics"] = eval_metrics
@@ -158,7 +149,6 @@ def batch_process_and_log():
             print(f"[!] Moving to next configuration folder due to error in sequence.")
             continue
 
-    # Save out the dictionary report structured cleanly as JSON
     with open(LOG_OUTPUT_FILE, "w") as out_file:
         json.dump(master_log, out_file, indent=4)
         
