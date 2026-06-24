@@ -5,9 +5,11 @@ import sys
 from pathlib import Path
 
 from src.dataset_generator import generate_datasets
+from src.visualizer import run_visualization
+from src.reconstruction import run_pipeline
+from src.analyzer import analyze_model
 
 def setup_environment(args):
-    """Automates localized virtual environment creation and handles pip dependency chains."""
     root_dir = Path(__file__).resolve().parent
     venv_dir = root_dir / "venv"
     req_file = root_dir / args.requirements
@@ -24,21 +26,18 @@ def setup_environment(args):
         req_file.write_text(default_dependencies)
         print(f"   -> Drop-file written: {req_file}")
 
-    # 2. Native programmatic deployment of venv
     if venv_dir.exists():
         print(f"Target environment signature already allocated at: {venv_dir}")
     else:
         print(f"Provisioning isolated virtual ecosystem space...")
         try:
             import venv
-            # Matches your 'include-system-site-packages = false' profile default
             venv.create(venv_dir, system_site_packages=False, with_pip=True)
             print("   -> Virtual environment successfully built.")
         except Exception as e:
             print(f"[CRITICAL ERROR]: venv construction failed natively. Details: {str(e)}")
             sys.exit(1)
 
-    # 3. Resolve platform execution paths safely (Windows vs Unix/macOS)
     is_windows = sys.platform == "win32"
     python_binary = venv_dir / "Scripts" / "python.exe" if is_windows else venv_dir / "bin" / "python"
     pip_binary = venv_dir / "Scripts" / "pip.exe" if is_windows else venv_dir / "bin" / "pip"
@@ -47,7 +46,6 @@ def setup_environment(args):
         print(f"[CRITICAL ERROR]: Subprocess router failed to locate environment binaries at: {python_binary}")
         sys.exit(1)
 
-    # 4. Run setup optimization layers
     try:
         print(f"Core-upgrading internal package manager (pip)...")
         subprocess.run([str(python_binary), "-m", "pip", "install", "--upgrade", "pip"], check=True, capture_output=True)
@@ -73,7 +71,6 @@ def setup_environment(args):
 
 
 def generate_dataset_layout(args):
-    """Routes the CLI arguments to the unified dataset generator."""
     try:
         generate_datasets(args)
     except Exception as e:
@@ -82,7 +79,6 @@ def generate_dataset_layout(args):
 
 
 def execute_reconstruction_pipeline(args):
-    """Reads context markers from target workspace and executes localized COLMAP processes."""
     workspace_path = Path(args.workspace).resolve()
     meta_file = workspace_path / "metadata.json"
     
@@ -98,25 +94,22 @@ def execute_reconstruction_pipeline(args):
     print(f"   Context Profile Detected : {context['generation_mode']}")
     print(f"   Hardware Optimization    : {'GPU Accelerated' if args.use_gpu else 'CPU Bound (Default)'}")
     print("="*80)
+    run_pipeline(workspace_path, context, args.use_gpu)
 
 
-def launch_visualization_interface(args):
-    """Aligns existing sparse trajectories to Ground Truth and triggers localized Open3D or Plot3D profiles."""
-    workspace_path = Path(args.workspace).resolve()
-    gt_path = Path(args.gt).resolve()
-    
-    if not gt_path.exists():
-        print(f"[CRITICAL ERROR]: Ground truth directory path not found: {gt_path}")
+def extract_model_metrics(args):
+    try:
+        analyze_model(args.workspace)
+    except Exception as e:
+        print(f" [ANALYZER ERROR]: {str(e)}")
         sys.exit(1)
 
-    print("\n" + "="*80)
-    print(f"COMMENCING GEOMETRIC EVALUATION ANALYSIS")
-    print(f"   Selected Interface View: {args.mode.upper()}")
-    print("=" * 80)
-
-# -----------------------------------------------------------------------------
-# 3. CLI CONTROL INTERFACE ARGPARSE DEF DEFINITIONS
-# -----------------------------------------------------------------------------
+def launch_visualization_interface(args):
+    try:
+        run_visualization(args)
+    except Exception as e:
+        print(f"[VISUALIZATION FRAMEWORK CRASH]: {str(e)}")
+        sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -131,7 +124,6 @@ def main():
     p_setup.set_defaults(func=setup_environment)
 
     # Command 1: DATASET GENERATION
-    # Command 1: DATASET GENERATION
     p_data = subparsers.add_parser("dataset", help="Generate custom split variants compatible with COLMAP model configurations.")
     p_data.add_argument("-p", "--project", type=str, required=True, help="Unique name tag folder for this experiment sequence run")
     p_data.add_argument("-d", "--dataset", type=str, default="./dataset", help="Input absolute or relative path to raw source image folder")
@@ -139,15 +131,12 @@ def main():
     
     p_data.add_argument("-t", "--type", type=str, choices=["overlap", "center", "full", "3d_points"], required=True, help="Splitting strategy execution matrix")
     
-    # Optional Range Bound Args
     p_data.add_argument("--start_frame", type=int, default=None, help="Global Sequence Start Frame Index (Defaults to 0)")
     p_data.add_argument("--end_frame", type=int, default=None, help="Global Sequence End Frame Index (Defaults to last available frame)")
     
-    # Sub-parameters (Configured to accept comma-separated strings for batch generation)
     p_data.add_argument("--overlap_pct", type=str, default="50", help="Comma-separated list of overlaps (e.g., '10, 20, 35')")
     p_data.add_argument("--center_frame", type=str, default="500", help="Comma-separated list of center frames (e.g., '100, 300, 500')")
     
-    # 3D Point Specific Parameters
     p_data.add_argument("--full_recon_dir", type=str, default=None, help="Reference directory containing complete baseline model data")
     p_data.add_argument("--target_means", type=str, default="300", help="Comma-separated list of target 3D point means (e.g., '200, 350, 600')")
     p_data.add_argument("--num_common", type=int, default=30, help="Number of target common/overlap images for 3D point sampling")
@@ -161,12 +150,25 @@ def main():
     p_run.add_argument("--use_gpu", action="store_true", help="Toggle flag to switch pipeline engine execution matrix to GPU acceleration.")
     p_run.set_defaults(func=execute_reconstruction_pipeline)
 
-    # Command 3: VISUALIZATION PROFILE METRICS
+# Command 3: VISUALIZATION PROFILE METRICS
     p_eval = subparsers.add_parser("visualize", help="Execute geometric trajectory comparisons, error logging, and rendering profiles.")
     p_eval.add_argument("-w", "--workspace", type=str, required=True, help="Path directly targeting the processed workspace directory")
     p_eval.add_argument("-g", "--gt", type=str, default="./dataset", help="Path directory location containing corresponding ground truth pose profile text sequences")
-    p_eval.add_argument("-m", "--mode", type=str, choices=["open3d", "plot3d"], default="open3d", help="Interface rendering profile selection engine format")
+    
+    p_eval.add_argument("--color_ds1", type=str, default="1.0, 0.4, 0.4", help="RGB Float Color for Dataset 1 (e.g. '1.0, 0.0, 0.0')")
+    p_eval.add_argument("--color_ds2", type=str, default="0.4, 0.4, 1.0", help="RGB Float Color for Dataset 2")
+    p_eval.add_argument("--color_overlap", type=str, default="0.2, 1.0, 1.0", help="RGB Float Color for the overlapping regions")
+    p_eval.add_argument("--color_gt", type=str, default="0.0, 1.0, 0.0", help="RGB Float Color for Ground Truth Trajectory")
+    
+    p_eval.add_argument("--point_size", type=float, default=1.0, help="Float size multiplier for 3D point cloud thickness")
+    p_eval.add_argument("--camera_scale", type=float, default=1.0, help="Float size multiplier for camera frustum wireframes")
+    
     p_eval.set_defaults(func=launch_visualization_interface)
+
+    # Command 4: MODEL DENSITY ANALYZER
+    p_analyze = subparsers.add_parser("analyze", help="Extract point density metrics and plot histograms from a merged model.")
+    p_analyze.add_argument("-w", "--workspace", type=str, required=True, help="Path targeting the processed workspace directory")
+    p_analyze.set_defaults(func=extract_model_metrics)
 
     args = parser.parse_args()
     args.func(args)
