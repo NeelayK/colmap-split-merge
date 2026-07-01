@@ -48,7 +48,10 @@ def split_by_center_frames(source_dir, base_workspace_dir, center_frames, overla
         ds2_start = max(start_idx, center_frame - left_overlap)
         ds2_end = end_idx
         
-        if ds1_end <= ds1_start or ds2_end <= ds2_start:
+        ds1_indices = range(ds1_start, ds1_end)
+        ds2_indices = range(ds2_start, ds2_end)
+        
+        if not ds1_indices or not ds2_indices:
             print(f"Warning: Invalid frame range generated for center frame {center_frame}. Skipping.")
             continue
 
@@ -62,22 +65,38 @@ def split_by_center_frames(source_dir, base_workspace_dir, center_frames, overla
         if workspace.exists():
             shutil.rmtree(workspace)
             
-        ds1_img_dir = workspace / "dataset1" / "images"
-        ds2_img_dir = workspace / "dataset2" / "images"
+        # Unified tracking directories structure
+        unified_img_dir = workspace / "images"
+        sparse1_dir = workspace / "sparse1"
+        sparse2_dir = workspace / "sparse2"
+        merged_dir = workspace / "merged"
         
-        ds1_img_dir.mkdir(parents=True, exist_ok=True)
-        ds2_img_dir.mkdir(parents=True, exist_ok=True)
+        for directory in [unified_img_dir, sparse1_dir, sparse2_dir, merged_dir]:
+            directory.mkdir(parents=True, exist_ok=True)
+            
+        overlap_set = set(ds1_indices).intersection(set(ds2_indices))
+        union_indices = sorted(list(set(ds1_indices).union(set(ds2_indices))))
         
-        actual_overlap = max(0, ds1_end - ds2_start)
-        print(f"\n--- Center Frame: {center_frame} ({folder_suffix}) ---")
-        print(f"  Dataset 1: {ds1_end - ds1_start} images (Indices {ds1_start} to {ds1_end - 1})")
-        print(f"  Dataset 2: {ds2_end - ds2_start} images (Indices {ds2_start} to {ds2_end - 1})")
-        print(f"  Overlap  : {actual_overlap} images shared in common")
+        print(f" -> Generated: {folder_suffix}")
+        print(f"    - Dataset 1 Range : {min(ds1_indices)} to {max(ds1_indices)} ({len(ds1_indices)} frames)")
+        print(f"    - Dataset 2 Range : {min(ds2_indices)} to {max(ds2_indices)} ({len(ds2_indices)} frames)")
+        print(f"    - Common Overlap  : {len(overlap_set)} frames total")
         
-        for i in range(ds1_start, ds1_end):
-            shutil.copy(images[i], ds1_img_dir / images[i].name)
-        for i in range(ds2_start, ds2_end):
-            shutil.copy(images[i], ds2_img_dir / images[i].name)
+        # Copy union dataset to the unified images folder
+        for idx in union_indices:
+            shutil.copy(images[idx], unified_img_dir / images[idx].name)
+            
+        # Write specific image tracking lists
+        ds1_list_path = workspace / "dataset1_list.txt"
+        ds2_list_path = workspace / "dataset2_list.txt"
+        
+        with open(ds1_list_path, "w") as f:
+            for idx in ds1_indices:
+                f.write(f"{images[idx].name}\n")
+                
+        with open(ds2_list_path, "w") as f:
+            for idx in ds2_indices:
+                f.write(f"{images[idx].name}\n")
 
     print(f"\nSuccessfully generated workspaces inside: '{base_workspace}'")
     return True

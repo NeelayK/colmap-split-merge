@@ -8,7 +8,7 @@ import pycolmap
 #-------------------------------------------------------------------------------
 # Configuration Settings
 #-------------------------------------------------------------------------------
-WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\colmap_workspace-2")
+WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\test2")
 DATASET_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\dataset")
 
 # Open3D Visual Customizations
