@@ -65,7 +65,6 @@ def split_by_center_frames(source_dir, base_workspace_dir, center_frames, overla
         if workspace.exists():
             shutil.rmtree(workspace)
             
-        # Unified tracking directories structure
         unified_img_dir = workspace / "images"
         sparse1_dir = workspace / "sparse1"
         sparse2_dir = workspace / "sparse2"
@@ -82,11 +81,9 @@ def split_by_center_frames(source_dir, base_workspace_dir, center_frames, overla
         print(f"    - Dataset 2 Range : {min(ds2_indices)} to {max(ds2_indices)} ({len(ds2_indices)} frames)")
         print(f"    - Common Overlap  : {len(overlap_set)} frames total")
         
-        # Copy union dataset to the unified images folder
         for idx in union_indices:
             shutil.copy(images[idx], unified_img_dir / images[idx].name)
             
-        # Write specific image tracking lists
         ds1_list_path = workspace / "dataset1_list.txt"
         ds2_list_path = workspace / "dataset2_list.txt"
         

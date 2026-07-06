@@ -5,13 +5,9 @@ import numpy as np
 import open3d as o3d
 import pycolmap
 
-#-------------------------------------------------------------------------------
-# Configuration Settings
-#-------------------------------------------------------------------------------
 WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\test2")
 DATASET_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\dataset")
 
-# Open3D Visual Customizations
 POINT_SIZE = 1.5
 CAMERA_FRUSTUM_SIZE = 0.005
 LINE_WIDTH = 2.0
@@ -25,12 +21,9 @@ COLOR_OVERLAP_CAMERAS = [0.2, 1.0, 1.0]          # Cyan
 COLOR_FULL_RECON_CAMERAS = [1.0, 0.8, 0.0]       # Orange
 COLOR_UNASSIGNED_CAMERAS = [1.0, 0.1, 1.0]       # Purple
 COLOR_FULL_RECON_POINTS = [0.7, 0.0, 1.0]     
-#-------------------------------------------------------------------------------
-# Math and Alignment Utilities
-#-------------------------------------------------------------------------------
+
+
 def umeyama_alignment(src, dst):
-    """Computes the optimal rigid transformation (Scale, Rotation, Translation) 
-    that aligns src points to dst points using the absolute orientation method."""
     num_pts, dim = src.shape
     src_mean, dst_mean = src.mean(axis=0), dst.mean(axis=0)
     src_centered, dst_centered = src - src_mean, dst - dst_mean
@@ -49,8 +42,6 @@ def umeyama_alignment(src, dst):
     return T, Scale
 
 def make_rigid(matrix_4x4):
-    """Normalizes the rotation component of a transformation matrix to enforce 
-    strict rigidity (removes scaling factors for rendering camera frustums)."""
     T_rigid = np.eye(4)
     R = matrix_4x4[:3, :3]
     scale = np.linalg.norm(R, axis=0)
@@ -59,8 +50,6 @@ def make_rigid(matrix_4x4):
     return T_rigid
 
 def camera_to_world_pose(image):
-    """Extracts and computes the 4x4 Camera-to-World transformation matrix 
-    from a pycolmap Image object across varying API versions."""
     if hasattr(image, "cam_from_world"):
         cfw = image.cam_from_world
         rigid3d = cfw() if callable(cfw) else cfw
@@ -77,12 +66,7 @@ def camera_to_world_pose(image):
     T_w2c[:3, 3] = t_w2c() if callable(t_w2c) else t_w2c
     return np.linalg.inv(T_w2c)
 
-#-------------------------------------------------------------------------------
-# Data Loading and Geometry Generation
-#-------------------------------------------------------------------------------
 def load_ground_truth_poses(dataset_path):
-    """Scans the dataset folder for *.pose.txt files, extracting the base frame 
-    index stem to build an accurate mapping of coordinate systems."""
     dataset_p = Path(dataset_path).resolve()
     gt_poses = {}
     
@@ -101,7 +85,6 @@ def load_ground_truth_poses(dataset_path):
     return gt_poses
 
 def create_camera_frustum(T_pose, color, size=0.03):
-    """Generates an Open3D LineSet representing a camera frustum wireframe."""
     local_pts = np.array([
         [0, 0, 0], 
         [-size, -size, size * 2], 
@@ -118,13 +101,9 @@ def create_camera_frustum(T_pose, color, size=0.03):
     line_set.colors = o3d.utility.Vector3dVector([color for _ in range(len(lines))])
     return line_set
 
-#-------------------------------------------------------------------------------
-# Evaluation Core Run
-#-------------------------------------------------------------------------------
 def evaluate_and_render_workspace(workspace_path, gt_poses):
     w_path = Path(workspace_path).resolve()
     
-    # Smart structural auto-detection: scan for where the valid binary model actually sits
     reconstruction = None
     model_dir = None
     candidate_subdirs = ["merged", "sparse/0", "sparse"]
@@ -145,12 +124,10 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
         print(f"Skipping {w_path.name}: Could not find a valid sparse reconstruction containing registered cameras.")
         return
 
-    # Dynamically evaluate profile assignment
     list1_path = w_path / "dataset1_list.txt"
     list2_path = w_path / "dataset2_list.txt"
     is_split_pipeline = list1_path.exists() or list2_path.exists() or model_dir.name == "merged"
 
-    # Load split tracking lists if applicable
     set_ds1, set_ds2 = set(), set()
     if list1_path.exists():
         with open(list1_path, "r") as f:
@@ -167,11 +144,10 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
     predicted_centers = []
     true_centers = []
 
-    # FIX: Loop properly over sorted image IDs and extract string tracking names safely
     for im_id in sorted(list(reg_images.keys())):
         im = reg_images[im_id]
         name = im.name
-        base_stem = Path(name).name.split('.')[0].lower()  # Extracts 'frame-000000' cleanly
+        base_stem = Path(name).name.split('.')[0].lower()
         
         if base_stem in gt_poses:
             matched_keys.append((im_id, base_stem))
@@ -185,10 +161,8 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
     predicted_centers = np.array(predicted_centers)
     true_centers = np.array(true_centers)
     
-    # Calculate global trajectory rigid alignment metrics
     transform_matrix, scale_factor = umeyama_alignment(predicted_centers, true_centers)
 
-    # Compute Trajectory ATE Profiles
     aligned_predicted_centers = []
     errors_mm = []
     for i, (im_id, base_stem) in enumerate(matched_keys):
@@ -202,14 +176,12 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
     ate_mean = np.mean(errors_mm)
     ate_max = np.max(errors_mm)
 
-    # Gather structure cloud points
     xyz_list, rgb_list = [], []
     for point3D_id, point3D in reconstruction.points3D.items():
         xyz_list.append(point3D.xyz)
         
         if not is_split_pipeline:
-            pt_color = COLOR_FULL_RECON_POINTS  # Crucial Change: Turned point cloud purple for global runs
-        else:
+            pt_color = COLOR_FULL_RECON_POINTS
             observing_images = [img_id_to_name[te.image_id] for te in point3D.track.elements if te.image_id in img_id_to_name]
             seen_ds1 = any(i in set_ds1 for i in observing_images)
             seen_ds2 = any(i in set_ds2 for i in observing_images)
@@ -254,7 +226,6 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
         pcd_filtered = pcd.select_by_index(inliers)
         geometries.append(pcd_filtered)
 
-    # Crucial Change: Filter Ground Truth track down to only the registered/used image frames
     active_gt_stems = sorted([stem for _, stem in matched_keys])
     gt_trajectory_points = [gt_poses[stem][:3, 3] for stem in active_gt_stems]
     gt_trajectory_lines = [[i, i+1] for i in range(len(gt_trajectory_points)-1)]
@@ -265,7 +236,6 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
     gt_line_set.paint_uniform_color(COLOR_GROUND_TRUTH_TRAJECTORY)
     geometries.append(gt_line_set)
 
-    # Draw aligned estimated track
     pred_trajectory_lines = [[i, i+1] for i in range(len(aligned_predicted_centers)-1)]
     pred_line_set = o3d.geometry.LineSet()
     pred_line_set.points = o3d.utility.Vector3dVector(aligned_predicted_centers)
@@ -273,7 +243,6 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
     pred_line_set.paint_uniform_color(COLOR_PREDICTED_TRAJECTORY)
     geometries.append(pred_line_set)
 
-    # Populate camera wireframe frustums
     for im_id in reg_images.keys():
         im = reg_images[im_id]
         name = im.name
@@ -294,7 +263,6 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
         frustum = create_camera_frustum(c2w_aligned, cam_color, CAMERA_FRUSTUM_SIZE)
         geometries.append(frustum)
 
-    # Render Screen Canvas
     vis = o3d.visualization.Visualizer()
     vis.create_window(window_name=f"Metrics Engine - {w_path.name}", width=1280, height=720)
     
@@ -309,9 +277,6 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
     vis.run()
     vis.destroy_window()
 
-#-------------------------------------------------------------------------------
-# Core Engine Sequence Entrypoint
-#-------------------------------------------------------------------------------
 def main():
     if not DATASET_DIR.exists():
         print(f"Error: Target data path directory does not exist: {DATASET_DIR}")
@@ -330,7 +295,6 @@ def main():
 
     valid_workspaces = []
     
-    # Target either a root collection directory or directly target an evaluation folder
     workspace_name_lower = WORKSPACE_DIR.name.lower()
     if any(k in workspace_name_lower for k in ["mean_", "overlap_", "center", "full", "global"]):
         valid_workspaces.append(WORKSPACE_DIR)
