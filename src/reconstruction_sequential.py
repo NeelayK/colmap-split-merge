@@ -4,7 +4,6 @@
 # appropriate pipeline path: split-mapping with sub-model merging or full-pass 
 # single sequence tracking reconstruction. Tracks execution duration per step 
 # and exports telemetry reports to JSON format within each workspace.
-# Designed for Windows environments running COLMAP 4.1.0.
 #-------------------------------------------------------------------------------
 
 import subprocess
@@ -88,25 +87,19 @@ def execute_adaptive_batch_reconstruction(base_dir):
             "--FeatureExtraction.use_gpu", USE_GPU
         ]
 
-        # Use sequential matching instead of exhaustive matching for efficiency across all structures
         cmd_match = [
             "colmap", "sequential_matcher",
             "--database_path", str(db_path),
             "--FeatureMatching.type", "ALIKED_LIGHTGLUE",
             "--FeatureMatching.use_gpu", USE_GPU,
-            "--SequentialMatching.overlap", "10" # Matches frame i with i+1 up to i+10
+            "--SequentialMatching.overlap", "10"
         ]
 
         timing_data = {}
 
         try:
-            # 1. Feature Extraction
             timing_data["feature_extraction"] = run_command(cmd_extract, f"1/X Feature Extraction ({workspace_dir.name})")
-
-            # 2. Sequential Sequence Feature Matching 
             timing_data["feature_matching"] = run_command(cmd_match, f"2/X Sequential Feature Matching ({workspace_dir.name})")
-
-            # 3. Reconstruction / Mapping Passes
             if is_split_pipeline:
                 list1_path = workspace_dir / "dataset1_list.txt"
                 list2_path = workspace_dir / "dataset2_list.txt"

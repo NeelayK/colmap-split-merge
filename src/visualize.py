@@ -5,7 +5,7 @@ import numpy as np
 import open3d as o3d
 import pycolmap
 
-WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\colmap-workspace-2")
+WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\test-3")
 DATASET_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\dataset")
 
 POINT_SIZE = 1.5
