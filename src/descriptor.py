@@ -1,3 +1,12 @@
+#-------------------------------------------------------------------------------
+# 7Scenes COLMAP Global Image Descriptor
+# Uses a pre-trained VGG16 model to extract global image descriptors
+# for all images in a dataset.
+# Computes pairwise cosine similarity and exports the top-k most similar image pairs
+# Use mainly for simple non-temporal image matching and retrieval tasks.
+# Simple version of a global descriptor engine for COLMAP datasets.
+#-------------------------------------------------------------------------------
+
 import os
 from pathlib import Path
 import json
@@ -14,14 +23,14 @@ TOP_K = 20
 class GlobalDescriptorExtractor:
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Initializing Global Descriptor Engine on backend device: {self.device}")
+        print(f"Device: {self.device}")
         
         base_model = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
         self.feature_extractor = base_model.features.to(self.device)
         self.feature_extractor.eval()
         
         self.transform = transforms.Compose([
-            transforms.Resize((480, 640)), # Scale to uniform shape for fast dense descriptor extraction
+            transforms.Resize((480, 640)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
@@ -86,7 +95,6 @@ def run_global_descriptor_pipeline(workspace_path, extractor, top_k):
     is_split_pipeline = list1_path.exists() and list2_path.exists()
     
     if is_split_pipeline:
-        print("[INFO] Split pipeline profile identified. Processing sequences separately.")
         
         with open(list1_path, "r") as f:
             ds1_names = [line.strip() for line in f if line.strip()]
@@ -122,7 +130,6 @@ def run_global_descriptor_pipeline(workspace_path, extractor, top_k):
             save_colmap_pairs_file(workspace_path / "image_pairs_dataset2.txt", ds2_pairs)
 
     else:
-        print("[INFO] Full unified sequence profile identified. Processing all directory contents together.")
         
         all_images = sorted([
             p.name for p in images_dir.iterdir() 

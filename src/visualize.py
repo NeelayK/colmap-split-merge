@@ -5,7 +5,7 @@ import numpy as np
 import open3d as o3d
 import pycolmap
 
-WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\test2")
+WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\colmap-workspace-2")
 DATASET_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\dataset")
 
 POINT_SIZE = 1.5
@@ -20,7 +20,7 @@ COLOR_DATASET_2_CAMERAS = [0.5, 0.5, 1.0]        # Light Blue
 COLOR_OVERLAP_CAMERAS = [0.2, 1.0, 1.0]          # Cyan
 COLOR_FULL_RECON_CAMERAS = [1.0, 0.8, 0.0]       # Orange
 COLOR_UNASSIGNED_CAMERAS = [1.0, 0.1, 1.0]       # Purple
-COLOR_FULL_RECON_POINTS = [0.7, 0.0, 1.0]     
+COLOR_FULL_RECON_POINTS = [0.7, 0.0, 1.0]        # Purple-ish blue
 
 
 def umeyama_alignment(src, dst):
@@ -182,6 +182,7 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
         
         if not is_split_pipeline:
             pt_color = COLOR_FULL_RECON_POINTS
+        else:
             observing_images = [img_id_to_name[te.image_id] for te in point3D.track.elements if te.image_id in img_id_to_name]
             seen_ds1 = any(i in set_ds1 for i in observing_images)
             seen_ds2 = any(i in set_ds2 for i in observing_images)
