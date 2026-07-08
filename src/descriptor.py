@@ -17,7 +17,7 @@ import torchvision.transforms as transforms
 from PIL import Image
 import numpy as np
 
-WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\test2")
+WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\test-3")
 TOP_K = 20
 
 class GlobalDescriptorExtractor:
