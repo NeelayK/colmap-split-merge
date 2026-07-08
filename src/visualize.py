@@ -12,15 +12,14 @@ POINT_SIZE = 1.5
 CAMERA_FRUSTUM_SIZE = 0.005
 LINE_WIDTH = 2.0
 
-# Centralized Color Palettes (RGB Normalized 0.0 - 1.0)
-COLOR_GROUND_TRUTH_TRAJECTORY = [0.0, 1.0, 0.0]  # Green
-COLOR_PREDICTED_TRAJECTORY = [1.0, 0.0, 0.0]     # Red
-COLOR_DATASET_1_CAMERAS = [1.0, 0.5, 0.5]        # Light Red
-COLOR_DATASET_2_CAMERAS = [0.5, 0.5, 1.0]        # Light Blue
-COLOR_OVERLAP_CAMERAS = [0.2, 1.0, 1.0]          # Cyan
-COLOR_FULL_RECON_CAMERAS = [1.0, 0.8, 0.0]       # Orange
-COLOR_UNASSIGNED_CAMERAS = [1.0, 0.1, 1.0]       # Purple
-COLOR_FULL_RECON_POINTS = [0.7, 0.0, 1.0]        # Purple-ish blue
+COLOR_GROUND_TRUTH_TRAJECTORY = [0.0, 1.0, 0.0] 
+COLOR_PREDICTED_TRAJECTORY = [1.0, 0.0, 0.0]    
+COLOR_DATASET_1_CAMERAS = [1.0, 0.5, 0.5]   
+COLOR_DATASET_2_CAMERAS = [0.5, 0.5, 1.0]   
+COLOR_OVERLAP_CAMERAS = [0.2, 1.0, 1.0]       
+COLOR_FULL_RECON_CAMERAS = [1.0, 0.8, 0.0]     
+COLOR_UNASSIGNED_CAMERAS = [1.0, 0.1, 1.0] 
+COLOR_FULL_RECON_POINTS = [0.7, 0.0, 1.0]        
 
 
 def umeyama_alignment(src, dst):
