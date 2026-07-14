@@ -55,10 +55,6 @@ def run_command(command_list, step_name):
 
 
 def find_best_submodel(sparse_base_path):
-    """
-    Scans all available subdirectories inside a sparse mapping folder
-    and uses pycolmap to choose the sub-model with the highest 3D points.
-    """
     if not sparse_base_path.exists():
         print(f"    [!] Error: Mapping base folder does not exist: {sparse_base_path.name}")
         return None
@@ -66,11 +62,9 @@ def find_best_submodel(sparse_base_path):
     best_sub_dir = None
     max_points3d_count = -1
 
-    # Look through subdirectories (usually folders named '0', '1', etc.)
     for sub_dir in sparse_base_path.iterdir():
         if sub_dir.is_dir():
             try:
-                # Attempt to parse layout configuration files via pycolmap core binding
                 reconstruction = pycolmap.Reconstruction(sub_dir)
                 points_count = len(reconstruction.points3D)
                 cameras_count = len(reconstruction.images)
@@ -80,7 +74,6 @@ def find_best_submodel(sparse_base_path):
                     max_points3d_count = points_count
                     best_sub_dir = sub_dir
             except Exception:
-                # Not a valid COLMAP reconstruction folder or directory is empty
                 continue
 
     if best_sub_dir:
@@ -89,7 +82,6 @@ def find_best_submodel(sparse_base_path):
 
 
 def execute_merger_recovery_pipeline(sub_workspace_str):
-    # Resolve the full workspace context path safely
     workspace_path = (BASE_PROJECT_DIR / sub_workspace_str).resolve()
 
     print("\n" + "#" * 80)
@@ -104,13 +96,11 @@ def execute_merger_recovery_pipeline(sub_workspace_str):
     sparse2_path = workspace_path / "sparse2"
     merged_path = workspace_path / "merged"
 
-    # Step 1: Deep structural cleanup of the destination target 'merged' path
     if merged_path.exists():
         print(f"--> [Purge] Cleary old workspace artifacts inside: {merged_path}")
         shutil.rmtree(merged_path)
     merged_path.mkdir(parents=True, exist_ok=True)
 
-    # Step 2: Dynamically isolate the largest models inside both components
     print("--> Evaluating optimal reconstruction candidates inside sub-datasets...")
     best_sparse1 = find_best_submodel(sparse1_path)
     best_sparse2 = find_best_submodel(sparse2_path)
@@ -120,11 +110,9 @@ def execute_merger_recovery_pipeline(sub_workspace_str):
         print(f"    Skipping execution tracking loop for context: {workspace_path.name}")
         return
 
-    # Initialize tracking container for update loops
     recovery_timings = {}
 
     try:
-        # Step 3: Run Model Merger
         cmd_merge = [
             "colmap", "model_merger",
             "--input_path1", str(best_sparse1),
@@ -133,7 +121,6 @@ def execute_merger_recovery_pipeline(sub_workspace_str):
         ]
         recovery_timings["model_merger"] = run_command(cmd_merge, f"Model Merger Pass ({workspace_path.name})")
 
-        # Step 4: Run Global Bundle Adjustment
         cmd_ba = [
             "colmap", "bundle_adjuster",
             "--input_path", str(merged_path),
@@ -141,7 +128,6 @@ def execute_merger_recovery_pipeline(sub_workspace_str):
         ]
         recovery_timings["global_bundle_adjustment"] = run_command(cmd_ba, f"Global Bundle Adjustment ({workspace_path.name})")
 
-        # Step 5: Read, rewrite, and correct the existing reconstruction timings profile JSON
         timing_file = workspace_path / "reconstruction_timing.json"
         existing_timings = {}
         if timing_file.exists():
@@ -151,11 +137,9 @@ def execute_merger_recovery_pipeline(sub_workspace_str):
             except Exception as e:
                 print(f"--> [Warning] Could not parse existing telemetry JSON: {e}")
 
-        # Inject update parameters
         existing_timings["model_merger"] = recovery_timings["model_merger"]
         existing_timings["global_bundle_adjustment"] = recovery_timings["global_bundle_adjustment"]
 
-        # Safely remove total pipeline time field before summing to avoid dirty additions
         existing_timings.pop("total_pipeline_time", None)
         existing_timings["total_pipeline_time"] = sum(v for v in existing_timings.values() if isinstance(v, (int, float)))
 
