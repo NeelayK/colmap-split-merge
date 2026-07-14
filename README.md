@@ -1,13 +1,13 @@
-# Unified SfM Reconstruction & Evaluation Pipeline
+# COLMAP split and merge Pipeline
 
-This repository provides a framework to automate dataset preparation, perform partitioned or unified sparse reconstructions using COLMAP, and comparing alignment with ground truth camera poses. This code has been tested on 7-Scenes Chess Dataset.
+This repository provides a framework to automate dataset preparation, perform partitioned or unified sparse reconstructions using COLMAP, and comparing alignment with ground truth camera poses. This code has been tested on 7-Scenes Dataset.
 
 ---
 
 
 ### Core Requirements
 
-* **Python 3.11 or 3.12** (Mandatory for `open3d` and `pycolmap`).
+* **Python 3.11 or 3.12**
 * **COLMAP Binary Executable**: The `colmap` command must be mapped to your system's environmental `PATH` variables. Verify your installation by executing:
 ```bash
 colmap -h
