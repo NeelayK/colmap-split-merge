@@ -17,13 +17,21 @@ import torchvision.transforms as transforms
 from PIL import Image
 import numpy as np
 
-WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\test-3")
+WORKSPACE_DIRS = [
+    Path(r"D:\Neelay\colmap-split-merge\output\red"),
+    Path(r"D:\Neelay\colmap-split-merge\output\chess"),
+    Path(r"D:\Neelay\colmap-split-merge\output\fire"),
+    Path(r"D:\Neelay\colmap-split-merge\output\heads"),
+    Path(r"D:\Neelay\colmap-split-merge\output\office"),
+    Path(r"D:\Neelay\colmap-split-merge\output\pumpkin"),
+    Path(r"D:\Neelay\colmap-split-merge\output\stairs"),
+]
+
 TOP_K = 20
 
 class GlobalDescriptorExtractor:
     def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Device: {self.device}")
+        self.device = "cpu"
         
         base_model = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
         self.feature_extractor = base_model.features.to(self.device)
@@ -154,32 +162,42 @@ def run_global_descriptor_pipeline(workspace_path, extractor, top_k):
             save_colmap_pairs_file(workspace_path / "image_pairs_global.txt", global_pairs)
 
 def main():
-    if not WORKSPACE_DIR.exists():
-        print(f"Error: Active execution workspace layout cannot be found: {WORKSPACE_DIR}")
-        return
+    extractor = None
 
-    valid_workspaces = []
-    
-    workspace_name_lower = WORKSPACE_DIR.name.lower()
-    if any(k in workspace_name_lower for k in ["mean_", "overlap_", "center", "full", "global"]):
-        valid_workspaces.append(WORKSPACE_DIR)
-    else:
-        for directory in sorted(list(WORKSPACE_DIR.iterdir())):
-            if directory.is_dir():
-                name_lower = directory.name.lower()
-                if any(k in name_lower for k in ["mean_", "overlap_", "center", "full", "global"]):
-                    valid_workspaces.append(directory)
+    for workspace_root in WORKSPACE_DIRS:
+        if not workspace_root.exists():
+            print(f"Skipping missing directory: {workspace_root}")
+            continue
 
-    if not valid_workspaces:
-        print("No active reconstruction pipeline configurations detected inside the tracked workspace root.")
-        return
+        print("\n" + "#" * 70)
+        print(f"DATASET: {workspace_root.name.upper()}")
+        print("#" * 70)
 
-    print(f"Discovered {len(valid_workspaces)} pipeline configurations. Building neural descriptor network environment...")
-    
-    extractor = GlobalDescriptorExtractor()
-    
-    for path in valid_workspaces:
-        run_global_descriptor_pipeline(path, extractor, TOP_K)
+        valid_workspaces = []
 
+        workspace_name_lower = workspace_root.name.lower()
+        if any(k in workspace_name_lower for k in ["mean_", "overlap_", "center", "full", "global"]):
+            valid_workspaces.append(workspace_root)
+        else:
+            for directory in sorted(workspace_root.iterdir()):
+                if directory.is_dir():
+                    name_lower = directory.name.lower()
+                    if any(k in name_lower for k in ["mean_", "overlap_", "center", "full", "global"]):
+                        valid_workspaces.append(directory)
+
+        if not valid_workspaces:
+            print("No active reconstruction pipeline configurations found.")
+            continue
+
+        print(f"Discovered {len(valid_workspaces)} pipeline configurations.")
+
+        # Build the network only once
+        if extractor is None:
+            print("Building neural descriptor network environment...")
+            extractor = GlobalDescriptorExtractor()
+
+        for path in valid_workspaces:
+            run_global_descriptor_pipeline(path, extractor, TOP_K)
+            
 if __name__ == "__main__":
     main()

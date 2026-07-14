@@ -5,21 +5,21 @@ import numpy as np
 import open3d as o3d
 import pycolmap
 
-WORKSPACE_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\test-3")
-DATASET_DIR = Path(r"C:\Users\neela\OneDrive\Documents\Github\colmap-split-merge\dataset")
+WORKSPACE_DIR = Path(r"D:\Neelay\colmap-split-merge\output\stairs")
+DATASET_DIR = Path(r"D:\Neelay\colmap-split-merge\dataset\stairs")
 
 POINT_SIZE = 1.5
 CAMERA_FRUSTUM_SIZE = 0.005
 LINE_WIDTH = 2.0
 
-COLOR_GROUND_TRUTH_TRAJECTORY = [0.0, 1.0, 0.0] 
-COLOR_PREDICTED_TRAJECTORY = [1.0, 0.0, 0.0]    
-COLOR_DATASET_1_CAMERAS = [1.0, 0.5, 0.5]   
-COLOR_DATASET_2_CAMERAS = [0.5, 0.5, 1.0]   
-COLOR_OVERLAP_CAMERAS = [0.2, 1.0, 1.0]       
-COLOR_FULL_RECON_CAMERAS = [1.0, 0.8, 0.0]     
-COLOR_UNASSIGNED_CAMERAS = [1.0, 0.1, 1.0] 
-COLOR_FULL_RECON_POINTS = [0.7, 0.0, 1.0]        
+COLOR_GROUND_TRUTH_TRAJECTORY = [0.0, 1.0, 0.0]
+COLOR_PREDICTED_TRAJECTORY = [1.0, 0.0, 0.0]
+COLOR_DATASET_1_CAMERAS = [1.0, 0.5, 0.5]
+COLOR_DATASET_2_CAMERAS = [0.5, 0.5, 1.0]
+COLOR_OVERLAP_CAMERAS = [0.2, 1.0, 1.0]
+COLOR_FULL_RECON_CAMERAS = [1.0, 0.8, 0.0]
+COLOR_UNASSIGNED_CAMERAS = [1.0, 0.1, 1.0]
+COLOR_FULL_RECON_POINTS = [0.7, 0.0, 1.0]
 
 
 def umeyama_alignment(src, dst):
@@ -34,7 +34,7 @@ def umeyama_alignment(src, dst):
     Rotation = U @ S_mat @ Vt
     Scale = np.trace(np.diag(S) @ S_mat) / np.var(src_centered, axis=0).sum()
     Translation = dst_mean - Scale * Rotation @ src_mean
-    
+
     T = np.eye(4)
     T[:3, :3] = Scale * Rotation
     T[:3, 3] = Translation
@@ -59,7 +59,7 @@ def camera_to_world_pose(image):
         t_w2c = image.tvec
     else:
         raise AttributeError("Unsupported pycolmap version pose layout structure.")
-    
+
     T_w2c = np.eye(4)
     T_w2c[:3, :3] = R_w2c() if callable(R_w2c) else R_w2c
     T_w2c[:3, 3] = t_w2c() if callable(t_w2c) else t_w2c
@@ -68,7 +68,7 @@ def camera_to_world_pose(image):
 def load_ground_truth_poses(dataset_path):
     dataset_p = Path(dataset_path).resolve()
     gt_poses = {}
-    
+
     for pose_file in dataset_p.rglob("*.pose.txt"):
         base_stem = pose_file.name.split('.')[0].lower()
         try:
@@ -85,15 +85,15 @@ def load_ground_truth_poses(dataset_path):
 
 def create_camera_frustum(T_pose, color, size=0.03):
     local_pts = np.array([
-        [0, 0, 0], 
-        [-size, -size, size * 2], 
-        [size, -size, size * 2], 
-        [size, size, size * 2], 
+        [0, 0, 0],
+        [-size, -size, size * 2],
+        [size, -size, size * 2],
+        [size, size, size * 2],
         [-size, size, size * 2]
     ])
     world_pts = (T_pose @ np.hstack([local_pts, np.ones((5, 1))]).T).T[:, :3]
     lines = [[0, 1], [0, 2], [0, 3], [0, 4], [1, 2], [2, 3], [3, 4], [4, 1]]
-    
+
     line_set = o3d.geometry.LineSet()
     line_set.points = o3d.utility.Vector3dVector(world_pts)
     line_set.lines = o3d.utility.Vector2iVector(lines)
@@ -102,11 +102,11 @@ def create_camera_frustum(T_pose, color, size=0.03):
 
 def evaluate_and_render_workspace(workspace_path, gt_poses):
     w_path = Path(workspace_path).resolve()
-    
+
     reconstruction = None
     model_dir = None
     candidate_subdirs = ["merged", "sparse/0", "sparse"]
-    
+
     for sub_dir in candidate_subdirs:
         target_path = w_path / sub_dir
         if target_path.exists():
@@ -123,6 +123,16 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
         print(f"Skipping {w_path.name}: Could not find a valid sparse reconstruction containing registered cameras.")
         return
 
+    # Attempt to load profiling metrics telemetry file
+    timing_data = {}
+    timing_file = w_path / "reconstruction_timing.json"
+    if timing_file.exists():
+        try:
+            with open(timing_file, "r") as f:
+                timing_data = json.load(f)
+        except Exception as e:
+            print(f"--> [SYSTEM] Warning reading timing metric array: {e}")
+
     list1_path = w_path / "dataset1_list.txt"
     list2_path = w_path / "dataset2_list.txt"
     is_split_pipeline = list1_path.exists() or list2_path.exists() or model_dir.name == "merged"
@@ -138,7 +148,7 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
 
     reg_images = reconstruction.images
     img_id_to_name = {im_id: im.name for im_id, im in reg_images.items()}
-    
+
     matched_keys = []
     predicted_centers = []
     true_centers = []
@@ -147,7 +157,7 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
         im = reg_images[im_id]
         name = im.name
         base_stem = Path(name).name.split('.')[0].lower()
-        
+
         if base_stem in gt_poses:
             matched_keys.append((im_id, base_stem))
             predicted_centers.append(im.projection_center())
@@ -159,7 +169,7 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
 
     predicted_centers = np.array(predicted_centers)
     true_centers = np.array(true_centers)
-    
+
     transform_matrix, scale_factor = umeyama_alignment(predicted_centers, true_centers)
 
     aligned_predicted_centers = []
@@ -178,14 +188,14 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
     xyz_list, rgb_list = [], []
     for point3D_id, point3D in reconstruction.points3D.items():
         xyz_list.append(point3D.xyz)
-        
+
         if not is_split_pipeline:
             pt_color = COLOR_FULL_RECON_POINTS
         else:
             observing_images = [img_id_to_name[te.image_id] for te in point3D.track.elements if te.image_id in img_id_to_name]
             seen_ds1 = any(i in set_ds1 for i in observing_images)
             seen_ds2 = any(i in set_ds2 for i in observing_images)
-            
+
             if seen_ds1 and seen_ds2:
                 pt_color = COLOR_OVERLAP_CAMERAS
             elif seen_ds1:
@@ -194,7 +204,7 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
                 pt_color = COLOR_DATASET_2_CAMERAS
             else:
                 pt_color = [0.3, 0.3, 0.3]
-                
+
         rgb_list.append(pt_color)
 
     xyz_arr = np.array(xyz_list)
@@ -212,6 +222,18 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
     print(f"Trajectory ATE RMSE       : {ate_rmse:.2f} mm")
     print(f"Trajectory ATE Mean       : {ate_mean:.2f} mm")
     print(f"Trajectory ATE Max        : {ate_max:.2f} mm")
+    
+    # Dynamically inject structural profiling report if the json was located
+    if timing_data:
+        print("-" * 60)
+        print(" PIPELINE EXECUTION PERFORMANCE TIMINGS ")
+        print("-" * 60)
+        for metric_name, seconds_val in timing_data.items():
+            # Clean formatting translation (e.g., "mapping_sub_dataset_1" -> "Mapping Sub Dataset 1")
+            formatted_lbl = metric_name.replace("_", " ").title()
+            formatted_lbl = formatted_lbl.replace("Ds1", "DS1").replace("Ds2", "DS2")
+            print(f"{formatted_lbl:<26}: {seconds_val:.3f} seconds")
+            
     print("="*60)
 
     geometries = []
@@ -221,7 +243,7 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
         pcd.points = o3d.utility.Vector3dVector(xyz_arr)
         pcd.colors = o3d.utility.Vector3dVector(rgb_arr)
         pcd.transform(transform_matrix)
-        
+
         _, inliers = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=1.5)
         pcd_filtered = pcd.select_by_index(inliers)
         geometries.append(pcd_filtered)
@@ -229,7 +251,7 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
     active_gt_stems = sorted([stem for _, stem in matched_keys])
     gt_trajectory_points = [gt_poses[stem][:3, 3] for stem in active_gt_stems]
     gt_trajectory_lines = [[i, i+1] for i in range(len(gt_trajectory_points)-1)]
-    
+
     gt_line_set = o3d.geometry.LineSet()
     gt_line_set.points = o3d.utility.Vector3dVector(gt_trajectory_points)
     gt_line_set.lines = o3d.utility.Vector2iVector(gt_trajectory_lines)
@@ -248,7 +270,7 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
         name = im.name
         c2w_orig = camera_to_world_pose(im)
         c2w_aligned = make_rigid(transform_matrix @ c2w_orig)
-        
+
         if not is_split_pipeline:
             cam_color = COLOR_FULL_RECON_CAMERAS
         elif name in set_overlap:
@@ -259,21 +281,21 @@ def evaluate_and_render_workspace(workspace_path, gt_poses):
             cam_color = COLOR_DATASET_2_CAMERAS
         else:
             cam_color = COLOR_UNASSIGNED_CAMERAS
-            
+
         frustum = create_camera_frustum(c2w_aligned, cam_color, CAMERA_FRUSTUM_SIZE)
         geometries.append(frustum)
 
     vis = o3d.visualization.Visualizer()
     vis.create_window(window_name=f"Metrics Engine - {w_path.name}", width=1280, height=720)
-    
+
     render_options = vis.get_render_option()
     render_options.point_size = POINT_SIZE
     render_options.line_width = LINE_WIDTH
     render_options.background_color = np.array([0.05, 0.05, 0.05])
-    
+
     for geom in geometries:
         vis.add_geometry(geom)
-        
+
     vis.run()
     vis.destroy_window()
 
@@ -294,7 +316,7 @@ def main():
         return
 
     valid_workspaces = []
-    
+
     workspace_name_lower = WORKSPACE_DIR.name.lower()
     if any(k in workspace_name_lower for k in ["mean_", "overlap_", "center", "full", "global"]):
         valid_workspaces.append(WORKSPACE_DIR)

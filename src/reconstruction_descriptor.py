@@ -10,26 +10,31 @@
 import subprocess
 import os
 import time
+import sys
 import json
 from pathlib import Path
 
-USE_GPU = "0"
+cuda_bin_path = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6\bin"
+if os.path.exists(cuda_bin_path):
+    os.environ["PATH"] = cuda_bin_path + os.pathsep + os.environ["PATH"]
+    if sys.version_info >= (3, 8):
+        try:
+            os.add_dll_directory(cuda_bin_path)
+            print(f"--> [SYSTEM] Windows DLL kernel link established with CUDA 12.6")
+        except Exception as e:
+            print(f"--> [SYSTEM] Note: Custom DLL directory handling: {e}")
+
+USE_GPU = "1"
 
 def sanitize_txt_file(file_path):
-    """
-    Strips Windows carriage returns (\\r) from text lists to prevent 
-    COLMAP string-matching database lookup errors.
-    """
+
     if not file_path.exists():
         return
     try:
         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
         
-        # Strip all whitespace and trailing carriage returns
         cleaned_lines = [line.strip() for line in lines if line.strip()]
-        
-        # Force strict Unix newline formatting (\n)
         with open(file_path, "w", newline="\n", encoding="utf-8") as f:
             for line in cleaned_lines:
                 f.write(line + "\n")
@@ -104,7 +109,6 @@ def execute_adaptive_batch_reconstruction(base_dir):
         db_path = workspace_dir / "database.db"
         img_path = workspace_dir / "images"
         
-        # 1. Setup Feature Extractor Command
         cmd_extract = [
             "colmap", "feature_extractor",
             "--database_path", str(db_path),
@@ -117,10 +121,8 @@ def execute_adaptive_batch_reconstruction(base_dir):
         timing_data = {}
 
         try:
-            # Step 1: Feature Extraction
             timing_data["feature_extraction"] = run_command(cmd_extract, f"1/X Feature Extraction ({workspace_dir.name})")
 
-            # Step 2: Global Descriptor Guided Matching Passes (via matches_importer)
             if is_split_pipeline:
                 pairs1_path = workspace_dir / "image_pairs_dataset1.txt"
                 pairs2_path = workspace_dir / "image_pairs_dataset2.txt"
@@ -130,11 +132,9 @@ def execute_adaptive_batch_reconstruction(base_dir):
                     print("Ensure you run your 'descriptor.py' script before running this pipeline!")
                     continue
 
-                # Run Sanitation on match pair list files
                 sanitize_txt_file(pairs1_path)
                 sanitize_txt_file(pairs2_path)
 
-                # Using matches_importer to cleanly parse space-separated image pairs
                 cmd_match1 = [
                     "colmap", "matches_importer",
                     "--database_path", str(db_path),
@@ -156,7 +156,6 @@ def execute_adaptive_batch_reconstruction(base_dir):
                 timing_data["descriptor_matching_ds1"] = run_command(cmd_match1, f"2a/X Descriptor Pairs Matching DS1 ({workspace_dir.name})")
                 timing_data["descriptor_matching_ds2"] = run_command(cmd_match2, f"2b/X Descriptor Pairs Matching DS2 ({workspace_dir.name})")
 
-                # Step 3: Sparse Reconstruction & Merging
                 list1_path = workspace_dir / "dataset1_list.txt"
                 list2_path = workspace_dir / "dataset2_list.txt"
                 sparse1_path = workspace_dir / "sparse1"
@@ -167,7 +166,6 @@ def execute_adaptive_batch_reconstruction(base_dir):
                 sparse2_path.mkdir(parents=True, exist_ok=True)
                 merged_path.mkdir(parents=True, exist_ok=True)
 
-                # Run Sanitation on image lists filtered by mapper
                 sanitize_txt_file(list1_path)
                 sanitize_txt_file(list2_path)
 
@@ -218,7 +216,6 @@ def execute_adaptive_batch_reconstruction(base_dir):
                     print("Ensure you run your 'descriptor.py' script before running this pipeline!")
                     continue
 
-                # Run Sanitation on global pair files
                 sanitize_txt_file(pairs_global_path)
 
                 cmd_match_global = [
@@ -232,7 +229,6 @@ def execute_adaptive_batch_reconstruction(base_dir):
 
                 timing_data["descriptor_matching_global"] = run_command(cmd_match_global, f"2/X Descriptor Global Matching ({workspace_dir.name})")
 
-                # Step 3: Full Sequence Mapping
                 sparse_path = workspace_dir / "sparse"
                 full_list_path = workspace_dir / "reconstruction_frame_list.txt"
                 sparse_path.mkdir(parents=True, exist_ok=True)
